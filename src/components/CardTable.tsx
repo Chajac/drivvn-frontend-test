@@ -52,10 +52,6 @@ const CardTable = () => {
 			});
 	};
 
-	// const shuffleDeckAndInit = async () => {
-
-	// };
-
 	const drawCard = () => {
 		const url = `https://deckofcardsapi.com/api/deck/${initialDeck.deck_id}/draw/?count=1`;
 		const drawnCard = axios
