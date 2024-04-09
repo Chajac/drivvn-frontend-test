@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ModeToggle } from "@/components/ModeToggle";
+import CardTable from "@/components/CardTable";
 import "./App.css";
 import { Toaster } from "./components/ui/toaster";
 
@@ -11,6 +12,9 @@ function App() {
 				<div className=" top-0 right-0 m-3">
 					<ModeToggle />
 				</div>
+			</div>
+			<div className="flex flex-col items-center content-evenly">
+				<CardTable />
 			</div>
 			<Toaster />
 		</ThemeProvider>
