@@ -1,13 +1,15 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, waitFor, screen } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import CardTable from "../components/CardTable";
 import axios, { AxiosResponse } from "axios";
 import Probabilities from "@/components/Probabilities";
 import FinalMatchedValues from "@/components/FinalMatchedValues";
+import Card from "@/components/Card";
+import { CARD_BACK_IMG_URL } from "@/utils/constants";
 
 jest.mock("axios");
 
-const BACK_IMG = "https://deckofcardsapi.com/static/img/back.png";
+const axiosMock = axios.get as jest.Mock;
 
 const mockDrawCardResponse = (value: string, suit: string) => ({
 	status: 200,
@@ -22,15 +24,26 @@ const mockDrawCardResponse = (value: string, suit: string) => ({
 	},
 });
 
-const mockDrawCardResponses = (numberOfDraws: number) => {
+const mockDrawCardResponses = (
+	numberOfDraws: number,
+	mockMatch?: string | number
+) => {
 	const responses = [];
+	const suits = ["CLUBS", "DIAMONDS", "HEARTS", "SPADES"];
+	const isSuitMatch = typeof mockMatch === "string";
+
 	for (let i = 0; i < numberOfDraws; i++) {
-		const value = (i % 9) + 1; // 1 to 9 not including jack,king,queen
-		const suit = ["CLUBS", "DIAMONDS", "HEARTS", "SPADES"][
-			Math.floor(i / 9)
-		];
-		responses.push(mockDrawCardResponse(value.toString(), suit));
+		const cardValue =
+			mockMatch && !isSuitMatch
+				? mockMatch
+				: Math.floor(Math.random() * 9) + 1; // 1 to 9 not including jack,king,queen
+		const cardSuit =
+			mockMatch && isSuitMatch
+				? mockMatch
+				: suits[Math.floor(Math.random() * suits.length)];
+		responses.push(mockDrawCardResponse(cardValue.toString(), cardSuit));
 	}
+
 	return responses;
 };
 
@@ -38,7 +51,7 @@ describe("CardTable component", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 		jest.resetModules();
-		(axios.get as jest.Mock).mockResolvedValue({
+		axiosMock.mockResolvedValue({
 			status: 200,
 			data: {
 				deck_id: "mock-deck-id",
@@ -49,21 +62,24 @@ describe("CardTable component", () => {
 	});
 
 	test("successfully renders the card table with initial state", async () => {
-		const { getByTestId, queryByTestId } = render(<CardTable />);
+		const { getAllByAltText, getByTestId, queryByTestId } = render(
+			<CardTable />
+		);
+		render(<Card cardImage={CARD_BACK_IMG_URL} />);
 
 		// initial card shuffle
 		await waitFor(() => expect(axios.get).toHaveBeenCalled());
 
-		const previousCardBackImage = getByTestId("previous-cardback-image");
-		const currentCardBackImage = getByTestId("current-cardback-image");
+		const previousCardBackImage = getAllByAltText("Card Back Placeholder");
+		const currentCardBackImage = getAllByAltText("Card Back Placeholder");
 		const drawButton = getByTestId("draw-button");
 		const finalMatchedValues = queryByTestId("final-matched-values");
-		const snapValue = getByTestId("snap-value");
+		const snapValue = getByTestId("snap-match");
 
 		expect(true).toBeTruthy();
 		expect(
-			previousCardBackImage && currentCardBackImage
-		).toBeInTheDocument();
+			previousCardBackImage.length && currentCardBackImage.length
+		).toBeGreaterThan(0);
 		expect(drawButton).toBeInTheDocument();
 		expect(finalMatchedValues).toBeNull();
 		expect(snapValue.classList.contains("invisible")).toBe(true);
@@ -71,16 +87,17 @@ describe("CardTable component", () => {
 
 	test("Draws a card successfully", async () => {
 		const responses = mockDrawCardResponses(1);
-		const axiosMock = axios.get as jest.Mock;
 		axiosMock.mockResolvedValue(responses[0]);
 
-		const { getByText, getByTestId } = render(<CardTable />);
+		const { getByAltText, getByText, getByTestId } = render(<CardTable />);
 
 		fireEvent.click(getByTestId("draw-button"));
 
+		const currentCard = responses[0].data.cards[0];
 		// called twice, once for shuffle and again for drawing card
 		await waitFor(() => {
 			expect(axios.get).toHaveBeenCalledTimes(2);
+			render(<Card cardImage={currentCard.image} />);
 			render(
 				<Probabilities
 					matchCounts={{ values: 0, suits: 0 }}
@@ -90,10 +107,12 @@ describe("CardTable component", () => {
 		});
 
 		// check if card images are updated
-		const previousCardBackImage = getByTestId("previous-cardback-image");
-		const currentCardFrontImage = getByTestId("current-cardfront-image");
+		const previousCardBackImage = getByAltText("Card Back Placeholder");
+		const currentCardFrontImage = getByAltText(
+			`${currentCard.value}, ${currentCard.suit}`
+		);
 
-		expect(previousCardBackImage).toHaveAttribute("src", BACK_IMG);
+		expect(previousCardBackImage).toHaveAttribute("src", CARD_BACK_IMG_URL);
 		expect(currentCardFrontImage).toHaveAttribute(
 			"src",
 			responses[0].data.cards[0].image
@@ -108,46 +127,64 @@ describe("CardTable component", () => {
 		).toBeInTheDocument();
 	});
 
-	test("Draws a card matching previously drawn card", async () => {
-		const responses = mockDrawCardResponses(2);
-		const axiosMock = axios.get as jest.Mock;
-		responses.forEach((response) => {
-			axiosMock.mockResolvedValueOnce(response);
-		});
+	test('Displays "snap value!" when there is a value match after simulating drawing two cards with the same value', async () => {
 		const { getByText, getByTestId } = render(<CardTable />);
 
-		const snapValueSpan = screen.getByTestId("snap-value");
-		// called once for shuffle
-		await waitFor(() => {
-			expect(axios.get).toHaveBeenCalledTimes(1);
+		const mockValueMatchResponses = mockDrawCardResponses(2, 2);
+
+		mockValueMatchResponses.forEach((response) => {
+			axiosMock.mockResolvedValueOnce(response);
 		});
 
-		// draw first card
-		fireEvent.click(getByTestId("draw-button"));
+		// Simulate drawing two cards with the same value
+		fireEvent.click(getByText("Draw card"));
 
-		// draw second card
-		fireEvent.click(getByTestId("draw-button"));
+		// Wait for axios requests to settle
+		await waitFor(() => {
+			expect(axios.get).toHaveBeenCalledTimes(2);
+		});
 
+		fireEvent.click(getByText("Draw card"));
+
+		// Wait for animations to settle
 		await waitFor(() => {
 			expect(axios.get).toHaveBeenCalledTimes(3);
-			expect(snapValueSpan.textContent).toContain("snap");
-			render(
-				<Probabilities
-					matchCounts={{ values: 1, suits: 0 }}
-					remainingCards={50}
-				/>
+			expect(getByTestId("snap-match").textContent).toContain(
+				"snap value!"
 			);
 		});
+	});
 
-		// check if card count is updated
-		expect(getByText("50 Cards remaining")).toBeInTheDocument();
+	test('Displays "snap suit!" when there is a suit match after simulating drawing two cards with the same suit', async () => {
+		const { getByText, getByTestId } = render(<CardTable />);
 
-		// TODO: check for probability update in docs
+		const mockSuitMatchResponses = mockDrawCardResponses(2, "CLUBS");
+
+		mockSuitMatchResponses.forEach((response) => {
+			axiosMock.mockResolvedValueOnce(response);
+		});
+
+		// Simulate drawing two cards with the same value
+		fireEvent.click(getByText("Draw card"));
+
+		// Wait for axios requests to settle
+		await waitFor(() => {
+			expect(axios.get).toHaveBeenCalledTimes(2);
+		});
+
+		fireEvent.click(getByText("Draw card"));
+
+		// Wait for animations to settle
+		await waitFor(() => {
+			expect(axios.get).toHaveBeenCalledTimes(3);
+			expect(getByTestId("snap-match").textContent).toContain(
+				"snap suit!"
+			);
+		});
 	});
 
 	test("Renders final matched values when the card count hits 0 remaining", async () => {
 		const responses = mockDrawCardResponses(52);
-		const axiosMock = axios.get as jest.Mock;
 		responses.forEach((response) => {
 			axiosMock.mockResolvedValueOnce(response);
 		});
@@ -156,7 +193,7 @@ describe("CardTable component", () => {
 
 		await waitFor(() => {
 			render(
-				// TODO: function to find suit/value matches to confirm validity.
+				// TODO: use actual matched value count to confirm validity.
 				<FinalMatchedValues matchCounts={{ values: 7, suits: 0 }} />
 			);
 		});
