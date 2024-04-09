@@ -5,6 +5,12 @@ import { ShuffledDeck, CardType, Matches } from "../interfaces/CardInterfaces";
 import axios from "axios";
 import Probabilities from "./Probabilities";
 import FinalMatchedValues from "./FinalMatchedValues";
+import Card from "./Card";
+import {
+	CARD_BACK_IMG_URL,
+	DECK_URL,
+	NEW_DECK_SHUFFLED_URL,
+} from "@/utils/constants";
 
 const CardTable = () => {
 	const [initialDeck, setInitialDeck] = useState<ShuffledDeck>({
@@ -29,8 +35,7 @@ const CardTable = () => {
 	const shuffleDeckAndInitRef = useRef<() => Promise<void>>();
 
 	shuffleDeckAndInitRef.current = async () => {
-		const url =
-			"https://deckofcardsapi.com/api/deck/new/shuffle/?deck_count=1";
+		const url = `${NEW_DECK_SHUFFLED_URL}/?deck_count=1`;
 		return axios
 			.get(url)
 			.then((res) => {
@@ -53,7 +58,7 @@ const CardTable = () => {
 	};
 
 	const drawCard = () => {
-		const url = `https://deckofcardsapi.com/api/deck/${initialDeck.deck_id}/draw/?count=1`;
+		const url = `${DECK_URL}/${initialDeck.deck_id}/draw/?count=1`;
 		const drawnCard = axios
 			.get(url)
 			.then((res) => {
@@ -71,7 +76,7 @@ const CardTable = () => {
 					setTimeout(() => {
 						// Reset the animation
 						setDrawnCardTrigger(false);
-					}, 250);
+					}, 350);
 				}
 			})
 			.catch((error) => {
@@ -119,28 +124,25 @@ const CardTable = () => {
 		<>
 			<div className="flex flex-col justify-center items-center mb-12">
 				<span
-					data-testid="snap-value"
-					className={`font-bold text-xl text-transform: uppercase ${
+					data-testid="snap-match"
+					className={`font-bold text-xl uppercase ${
 						currentMatchType ? "animate-fade-in" : ""
 					} ${currentMatchType ? "visible" : "invisible"}`}
 				>
-					snap {currentMatchType && currentMatchType}!
+					snap {currentMatchType}!
 				</span>
 				<div className="flex flex-row justify-center lg:gap-x-48 mt-8 sm:gap-x-2">
 					<div className="lg:w-64 lg:h-96 border-primary rounded-md mx-4">
 						{!previousCard ? (
-							<img
-								src="https://deckofcardsapi.com/static/img/back.png"
+							<Card
+								cardImage={CARD_BACK_IMG_URL}
 								alt="Card Back Placeholder"
-								className=" w-full h-full"
-								data-testid="previous-cardback-image"
 							/>
 						) : (
-							<img
-								src={previousCard.image}
+							<Card
+								cardImage={previousCard.image}
 								alt={`${previousCard.value}, ${previousCard.suit}`}
-								className=" z-50 w-full h-full"
-								data-testid="previous-cardfront-image"
+								className=" z-50"
 							/>
 						)}
 					</div>
@@ -148,29 +150,25 @@ const CardTable = () => {
 						className={`lg:w-64 lg:h-96 border-primary rounded-md mx-4 `}
 					>
 						{!currentCard ? (
-							<img
-								src="https://deckofcardsapi.com/static/img/back.png"
+							<Card
+								cardImage={CARD_BACK_IMG_URL}
 								alt="Card Back Placeholder"
-								className=" w-full h-full"
-								data-testid="current-cardback-image"
 							/>
 						) : (
 							currentCard && (
 								<div className="relative w-full h-full">
-									<img
-										src={currentCard.image}
+									<Card
+										cardImage={currentCard.image}
 										alt={`${currentCard.value}, ${currentCard.suit}`}
-										className="w-full h-full"
-										data-testid="current-cardfront-image"
 									/>
 									{previousCard && (
-										<img
-											src={previousCard.image}
+										<Card
+											cardImage={previousCard.image}
 											alt={`${previousCard.value}, ${previousCard.suit}`}
-											className={`-z-10 absolute top-0 left-0 w-full h-full border-primary rounded-md ${
+											className={`-z-10 absolute top-0 left-0 border-primary rounded-md duration-2450 ease-in-out${
 												drawnCardTrigger
-													? "transform translate-x-[-110%] lg:translate-x-[-181%] transition-transform duration-250 ease-in-out"
-													: ""
+													? " transition-transform transform translate-x-[-123%] md:translate-x-[-118%] lg:translate-x-[-187%]  "
+													: " duration-0 transition-transform transform translate-x-[0%] lg:translate-x-[-0%]"
 											}`}
 										/>
 									)}
